@@ -25,8 +25,8 @@ The map also flags the first thing worth knowing in a takeover: **four workflows
 
 <table>
 <tr>
-<td width="45%"><img src="docs/canvas-inherited.png" alt="The inherited workflow: enrol on Booked, wait, set Follow-up sent, create a task"></td>
-<td width="55%"><img src="docs/canvas-fixed.png" alt="The fixed workflow: enrol on Booked, wait, branch on whether the contact is still booked, only then set Follow-up sent and create the task"></td>
+<td valign="top"><img src="docs/canvas-inherited.png" width="260" alt="The inherited workflow: enrol on Booked, wait, set Follow-up sent, create a task"></td>
+<td valign="top"><img src="docs/canvas-fixed.png" width="470" alt="The fixed workflow: enrol on Booked, wait, branch on whether the contact is still booked, only then set Follow-up sent and create the task"></td>
 </tr>
 <tr>
 <td>Inherited: enrol, wait, follow up. Nothing looks at what happened during the wait.</td>
