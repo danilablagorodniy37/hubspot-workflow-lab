@@ -38,6 +38,7 @@ class FlowSummary:
     object_type: str
     enrolment: str
     re_enrol: bool | None
+    unenrol: bool | None = None
     actions: list[str] = field(default_factory=list)
     reads: set[str] = field(default_factory=set)
     writes: set[str] = field(default_factory=set)
@@ -78,6 +79,7 @@ def summarise(flow: dict) -> FlowSummary:
         object_type=str(flow.get("objectTypeId", "?")),
         enrolment=enrolment,
         re_enrol=crit.get("shouldReEnroll"),
+        unenrol=crit.get("unEnrollObjectsNotMeetingCriteria"),
     )
     for d in _walk(crit):
         for k in READ_KEYS:
@@ -92,10 +94,21 @@ def summarise(flow: dict) -> FlowSummary:
         if type_id == "0-1":
             detail = f" {fields.get('delta', '?')} {str(fields.get('time_unit', '')).lower()}"
         if written:
-            detail += " " + ", ".join(written)
+            value = fields.get("value")
+            shown = value.get("staticValue") if isinstance(value, dict) else value
+            detail += " " + ", ".join(written) + (f" = {shown}" if shown is not None else "")
             s.writes.update(written)
+        if type_id == "0-3" and fields.get("subject"):
+            detail += f' "{fields["subject"]}"'
         if action.get("type") in ("LIST_BRANCH", "STATIC_BRANCH") or "listBranches" in action:
             label = "If/then branch"
+            conditions = [
+                f"{b.get('branchName') or 'branch'}: " + "; ".join(_filters(b.get("filterBranch")))
+                for b in action.get("listBranches") or []
+            ]
+            detail = " " + " | ".join(conditions)
+            if action.get("defaultBranchName"):
+                detail += f" | otherwise: {action['defaultBranchName']}"
             for d in _walk(action):
                 for k in READ_KEYS:
                     if isinstance(d.get(k), str):
@@ -148,12 +161,14 @@ def to_markdown(summaries: list[FlowSummary]) -> str:
         "the places where two workflows read or write the same property: that is where changes",
         "break things.",
         "",
-        "| Workflow | On | Enrols when | Re-enrol | Reads | Writes |",
-        "|---|---|---|---|---|---|",
+        "| Workflow | On | Enrols when | Re-enrol | Unenrol when no longer matching "
+        "| Reads | Writes |",
+        "|---|---|---|---|---|---|---|",
     ]
     for s in summaries:
+        on = "yes" if s.enabled else "no"
         lines.append(
-            f"| {s.name} | {'yes' if s.enabled else 'no'} | {s.enrolment} | {s.re_enrol} | "
+            f"| {s.name} | {on} | {s.enrolment} | {s.re_enrol} | {s.unenrol} | "
             f"{', '.join(sorted(s.reads)) or '-'} | {', '.join(sorted(s.writes)) or '-'} |"
         )
     for s in summaries:

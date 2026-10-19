@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    name: lint, secrets, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - run: python scripts/check_secrets.py
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: pytest -q
+      - name: exported workflows are valid JSON
+        run: python -c "import json,glob; [json.load(open(p)) for p in glob.glob('workflows/*.json')]; print('ok')"

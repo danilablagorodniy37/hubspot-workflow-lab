@@ -38,6 +38,48 @@ def cmd_setup(args) -> int:
     return 0
 
 
+def cmd_build(args) -> int:
+    from .build import SPECS, apply
+    from .client import HubSpot
+
+    which = args.only or list(SPECS)
+    for key, outcome in apply(HubSpot(), which, enable=not args.off).items():
+        print(f"{key}: {outcome}")
+    return 0
+
+
+def cmd_history(args) -> int:
+    """Property history of contacts: when each value changed and what changed it."""
+    from .client import HubSpot
+
+    hs = HubSpot()
+    props = "discovery_call_status,follow_up_sent"
+    lines = [
+        "# Property history",
+        "",
+        "Read with `hslab history` (CRM v3 `propertiesWithHistory`).",
+        "",
+    ]
+    for cid in args.contact_ids:
+        d = hs.get(f"/crm/v3/objects/contacts/{cid}", propertiesWithHistory=props)
+        events = sorted(
+            (h["timestamp"], prop, h.get("value"), h.get("sourceType"))
+            for prop, hist in (d.get("propertiesWithHistory") or {}).items()
+            for h in hist
+        )
+        lines += [f"## Contact {cid}", "", "| Time (UTC) | Property | Value | Changed by |"]
+        lines += ["|---|---|---|---|"]
+        for ts, prop, value, source in events:
+            who = "the workflow" if source == "AUTOMATION_PLATFORM" else "the scenario script (API)"
+            lines.append(f"| {ts[11:19]} | `{prop}` | {value} | {who} |")
+        lines.append("")
+    md = "\n".join(lines)
+    if args.markdown:
+        Path(args.markdown).write_text(md, encoding="utf-8")
+    print(md)
+    return 0
+
+
 def cmd_map(args) -> int:
     from .client import HubSpot
     from .flowmap import export, fetch_all, summarise, to_markdown
@@ -83,6 +125,14 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--contacts", type=int, default=30)
     s.add_argument("--deals", type=int, default=10)
     s.set_defaults(func=cmd_setup)
+    s = sub.add_parser("build", help="create the lab workflows, or update them by name")
+    s.add_argument("--only", nargs="*", choices=["inherited", "no_show", "fixed"])
+    s.add_argument("--off", action="store_true", help="leave the workflows turned off")
+    s.set_defaults(func=cmd_build)
+    s = sub.add_parser("history", help="who changed the call status and the follow-up flag, when")
+    s.add_argument("contact_ids", nargs="+")
+    s.add_argument("--markdown", help="also write the table to this file")
+    s.set_defaults(func=cmd_history)
     s = sub.add_parser("map", help="export workflows as JSON and write docs/workflow-map.md")
     s.add_argument("--out", default="workflows")
     s.add_argument("--markdown", default="docs/workflow-map.md")
